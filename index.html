@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0a09">
+<meta name="description" content="Bloodchess — standard chess, except captured pieces stay where they fall. Play a bot or pass one phone between two players.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Bloodchess — every piece you take stays</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23120d0c'/%3E%3Ctext x='32' y='46' font-size='38' text-anchor='middle' fill='%23f2e8d5'%3E%E2%99%9E%3C/text%3E%3Ccircle cx='44' cy='49' r='6' fill='%23b30d1c'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+<div id="flash" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-knight" aria-hidden="true">♞</span>
+    <span class="brand-text">BLOOD<span>CHESS</span></span>
+  </div>
+  <div class="top-actions">
+    <button class="icon-btn" id="btnSound" aria-label="Toggle sound and haptics" title="Sound">🔊</button>
+    <button class="icon-btn" id="btnFlip" aria-label="Flip the board" title="Flip board">⇅</button>
+    <button class="icon-btn" id="btnMenu" aria-label="Open the menu" title="Menu">☰</button>
+  </div>
+</header>
+
+<main class="app">
+  <section class="board-column">
+    <div class="board-frame" id="boardFrame">
+      <div class="board" id="board" role="grid" aria-label="Chess board">
+        <div class="layer squares" id="squares"></div>
+        <div class="layer corpses" id="corpses" aria-hidden="true"></div>
+        <div class="layer marks" id="marks" aria-hidden="true"></div>
+        <div class="layer pieces" id="pieces"></div>
+        <div class="layer fx" id="fx" aria-hidden="true"></div>
+      </div>
+    </div>
+    <div class="turn-line" id="turnLine">
+      <span class="turn-dot" id="turnDot"></span>
+      <span class="turn-name" id="turnName">White</span>
+      <span class="turn-sub" id="turnSub">to move</span>
+      <span class="check-badge" id="checkBadge" hidden>Check</span>
+      <span class="bodies" id="bodies" title="Pieces taken — white / black">
+        <span class="dot w"></span><b id="killsW">0</b>
+        <span class="skull">☠</span>
+        <span class="dot b"></span><b id="killsB">0</b>
+      </span>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <span class="chip" id="modeChip">VS RUTHLESS</span>
+      <span class="thinking" id="thinking" hidden aria-label="Bot is thinking"><i></i><i></i><i></i></span>
+    </div>
+    <p class="status" id="statusText">Tap a piece, then a square.</p>
+    <div class="actions">
+      <button class="btn" id="btnUndo">↶ Undo</button>
+      <button class="btn" id="btnRematch">↺ Rematch</button>
+      <button class="btn" id="btnMenu2">☰ Menu</button>
+    </div>
+    <div class="log-wrap">
+      <div class="log-head"><span>Move log</span><span class="log-hint">bodies stay</span></div>
+      <div class="log" id="log" aria-live="polite"></div>
+    </div>
+  </aside>
+</main>
+
+<!-- ===================== MENU ===================== -->
+<div class="overlay show" id="menuOverlay">
+  <div class="sheet menu-sheet" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+    <button class="sheet-close" id="btnMenuClose" aria-label="Resume game" hidden>✕</button>
+    <div class="menu-head">
+      <div class="kicker">A chess game with no clean exits</div>
+      <h1 id="menuTitle">BLOOD<span>CHESS</span></h1>
+      <p class="lede">Standard rules. Nothing leaves the board. Every piece taken stays where it fell — and the blood stays with it.</p>
+    </div>
+
+    <div class="mode-grid" role="radiogroup" aria-label="Game mode">
+      <button class="mode-card selected" data-mode="bot" role="radio" aria-checked="true">
+        <span class="mode-glyph" aria-hidden="true">♞</span>
+        <span class="mode-copy">
+          <span class="mode-name">Play the machine</span>
+          <span class="mode-sub">Three appetites for violence</span>
+        </span>
+        <span class="mode-tick" aria-hidden="true">✓</span>
+      </button>
+      <button class="mode-card" data-mode="local" role="radio" aria-checked="false">
+        <span class="mode-glyph" aria-hidden="true">⚔</span>
+        <span class="mode-copy">
+          <span class="mode-name">Two players, one phone</span>
+          <span class="mode-sub">Pass it back and forth</span>
+        </span>
+        <span class="mode-tick" aria-hidden="true">✓</span>
+      </button>
+    </div>
+
+    <div class="option-block" id="botOptions">
+      <div class="opt">
+        <div class="opt-label">Opponent</div>
+        <div class="seg" id="difficultySeg">
+          <button data-diff="easy">Casual</button>
+          <button data-diff="medium" class="active">Ruthless</button>
+          <button data-diff="hard">Merciless</button>
+        </div>
+      </div>
+      <div class="opt">
+        <div class="opt-label">You play</div>
+        <div class="seg" id="sideSeg">
+          <button data-side="w" class="active">White</button>
+          <button data-side="b">Black</button>
+          <button data-side="random">Random</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="option-block" id="localOptions" hidden>
+      <label class="check"><input type="checkbox" id="autoFlip"> Rotate the board after every move</label>
+    </div>
+
+    <div class="toggles">
+      <label class="check"><input type="checkbox" id="soundToggle" checked> Sound &amp; haptics</label>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn btn-primary" id="btnStart">Begin the bloodshed</button>
+      <button class="btn btn-ghost" id="btnResume" hidden>Resume game</button>
+    </div>
+    <div class="fineprint">Full rules · castling · en passant · promotion · bodies never block</div>
+  </div>
+</div>
+
+<!-- ===================== PROMOTION ===================== -->
+<div class="overlay" id="promoOverlay">
+  <div class="sheet promo-sheet" role="dialog" aria-modal="true" aria-labelledby="promoTitle">
+    <div class="kicker">A pawn reaches the end</div>
+    <h2 id="promoTitle">Promote</h2>
+    <p class="lede small">Choose what crawls out of it.</p>
+    <div class="promo-grid" id="promoChoices"></div>
+    <button class="btn btn-ghost" id="promoCancel">Keep the pawn</button>
+  </div>
+</div>
+
+<!-- ===================== GAME OVER ===================== -->
+<div class="overlay" id="endOverlay">
+  <div class="sheet end-sheet" role="dialog" aria-modal="true" aria-labelledby="endTitle">
+    <div class="kicker">The board remembers</div>
+    <h2 id="endTitle">Checkmate</h2>
+    <p class="lede" id="endSub">White wins.</p>
+    <div class="end-stats" id="endStats"></div>
+    <div class="sheet-actions">
+      <button class="btn btn-primary" id="btnRematchEnd">Rematch</button>
+      <button class="btn btn-ghost" id="btnUndoEnd">Take the last move back</button>
+      <button class="btn btn-ghost" id="btnMenuEnd">Menu</button>
+    </div>
+  </div>
+</div>
+
+<noscript><div class="noscript">Bloodchess needs JavaScript. Enable it and reload.</div></noscript>
+
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
